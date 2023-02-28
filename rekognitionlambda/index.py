@@ -32,6 +32,8 @@ rekognition_client = boto3.client('rekognition')
 # Constructor for DynamoDB resource object
 dynamodb = boto3.resource('dynamodb')
 
+thumbBucket = os.environ['THUMBBUCKET']
+
 def handler(event, context):
 
     print("Lambda processing event: ", event)
