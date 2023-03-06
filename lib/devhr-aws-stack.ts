@@ -32,9 +32,17 @@ export class DevhrAwsStack extends cdk.Stack {
     // Image Bucket
     // =====================================================================================
     
-    const imageBucket = new s3.Bucket(this, imageBucketName);
+    const imageBucket = new s3.Bucket(this, imageBucketName, {
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
     new cdk.CfnOutput(this, 'imageBucket', { value: imageBucket.bucketName });
-    
+    const imageBucketArn = imageBucket.bucketArn;
+    imageBucket.addCorsRule({
+      allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
+      allowedOrigins: ["*"],
+      allowedHeaders: ["*"],
+      maxAge: 3000
+    });
 
     // =====================================================================================
     // Thumbnail Bucket
@@ -43,7 +51,13 @@ export class DevhrAwsStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     new cdk.CfnOutput(this, 'resizedBucket', {value: resizedBucket.bucketName});
-   
+    const resizedBucketArn = resizedBucket.bucketArn;
+    resizedBucket.addCorsRule({
+      allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
+      allowedOrigins: ["*"],
+      allowedHeaders: ["*"],
+      maxAge: 3000
+    });
     // =====================================================================================
     // Amazon DynamoDB table for storing image labels
     // =====================================================================================
@@ -149,6 +163,99 @@ export class DevhrAwsStack extends cdk.Stack {
       ],
     });
     
+     // =====================================================================================
+    // Cognito User Pool Authentication
+    // =====================================================================================
+    const userPool = new cognito.UserPool(this, "UserPool", {
+      selfSignUpEnabled: true, // Allow users to sign up
+      autoVerify: { email: true }, // Verify email addresses by sending a verification code
+      signInAliases: { username: true, email: true }, // Set email as an alias
+    });
+
+    const userPoolClient = new cognito.UserPoolClient(this, "UserPoolClient", {
+      userPool,
+      generateSecret: false, // Don't need to generate secret for web app running on browsers
+    });
+
+    const identityPool = new cognito.CfnIdentityPool(this, "ImageRekognitionIdentityPool", {
+      allowUnauthenticatedIdentities: false, // Don't allow unathenticated users
+      cognitoIdentityProviders: [
+        {
+        clientId: userPoolClient.userPoolClientId,
+        providerName: userPool.userPoolProviderName,
+        },
+      ],
+    });
+
+    const auth = new apigw.CfnAuthorizer(this, 'APIGatewayAuthorizer', {
+      name: 'customer-authorizer',
+      identitySource: 'method.request.header.Authorization',
+      providerArns: [userPool.userPoolArn],
+      restApiId: api.restApiId,
+      type: AuthorizationType.COGNITO,
+    });
+
+    const authenticatedRole = new iam.Role(this, "ImageRekognitionAuthenticatedRole", {
+      assumedBy: new iam.FederatedPrincipal(
+        "cognito-identity.amazonaws.com",
+          {
+          StringEquals: {
+              "cognito-identity.amazonaws.com:aud": identityPool.ref,
+          },
+          "ForAnyValue:StringLike": {
+            "cognito-identity.amazonaws.com:amr": "authenticated",
+          },
+        },
+        "sts:AssumeRoleWithWebIdentity"
+      ),
+    });
+
+    // IAM policy granting users permission to upload, download and delete their own pictures
+    authenticatedRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "s3:GetObject",
+          "s3:PutObject"
+        ],
+        effect: iam.Effect.ALLOW,
+        resources: [
+          imageBucketArn + "/private/${cognito-identity.amazonaws.com:sub}/*",
+          imageBucketArn + "/private/${cognito-identity.amazonaws.com:sub}",
+          resizedBucketArn + "/private/${cognito-identity.amazonaws.com:sub}/*",
+          resizedBucketArn + "/private/${cognito-identity.amazonaws.com:sub}"
+        ],
+      })
+    );
+
+    // IAM policy granting users permission to list their pictures
+    authenticatedRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["s3:ListBucket"],
+        effect: iam.Effect.ALLOW,
+        resources: [
+          imageBucketArn,
+          resizedBucketArn
+        ],
+        conditions: {"StringLike": {"s3:prefix": ["private/${cognito-identity.amazonaws.com:sub}/*"]}}
+      })
+    );
+
+    new cognito.CfnIdentityPoolRoleAttachment(this, "IdentityPoolRoleAttachment", {
+      identityPoolId: identityPool.ref,
+      roles: { authenticated: authenticatedRole.roleArn },
+    });
+
+    // Export values of Cognito
+    new CfnOutput(this, "UserPoolId", {
+      value: userPool.userPoolId,
+    });
+    new CfnOutput(this, "AppClientId", {
+      value: userPoolClient.userPoolClientId,
+    });
+    new CfnOutput(this, "IdentityPoolId", {
+      value: identityPool.ref,
+    });
+
     // =====================================================================================
     // API Gateway
     // =====================================================================================
@@ -156,8 +263,8 @@ export class DevhrAwsStack extends cdk.Stack {
     ​
     // GET /images
     imageAPI.addMethod('GET', lambdaIntegration, {
-      // authorizationType: AuthorizationType.COGNITO,
-      // authorizer: { authorizerId: auth.ref },
+      authorizationType: AuthorizationType.COGNITO,
+      authorizer: { authorizerId: auth.ref },
       requestParameters: {
         'method.request.querystring.action': true,
         'method.request.querystring.key': true
@@ -180,8 +287,8 @@ export class DevhrAwsStack extends cdk.Stack {
     
     // DELETE /images
     imageAPI.addMethod('DELETE', lambdaIntegration, {
-      // authorizationType: AuthorizationType.COGNITO,
-      // authorizer: { authorizerId: auth.ref },
+      authorizationType: AuthorizationType.COGNITO,
+      authorizer: { authorizerId: auth.ref },
       requestParameters: {
         'method.request.querystring.action': true,
         'method.request.querystring.key': true
