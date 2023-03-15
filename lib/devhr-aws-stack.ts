@@ -11,7 +11,7 @@ import { AuthorizationType, PassthroughBehavior } from '@aws-cdk/aws-apigateway'
 import { CfnOutput } from "@aws-cdk/core";
 import { Duration } from '@aws-cdk/core';
 import apigw = require('@aws-cdk/aws-apigateway');
-//import s3deploy = require('@aws-cdk/aws-s3-deployment');
+import s3deploy = require('@aws-cdk/aws-s3-deployment');
 import { HttpMethods } from '@aws-cdk/aws-s3';
 import sqs = require('@aws-cdk/aws-sqs');
 import s3n = require('@aws-cdk/aws-s3-notifications');
@@ -23,6 +23,7 @@ import { ContextProvider } from 'aws-cdk-lib';
 
 const imageBucketName = "cdk-rekn-imgagebucket"
 const resizedBucketName = imageBucketName + "-resized"
+const websiteBucketName = "cdk-rekn-publicbucket"
 
 export class DevhrAwsStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -58,11 +59,48 @@ export class DevhrAwsStack extends cdk.Stack {
       allowedHeaders: ["*"],
       maxAge: 3000
     });
+
+    
+    // =====================================================================================
+    // Construct to create our Amazon S3 Bucket to host our website
+    // =====================================================================================
+    const webBucket = new s3.Bucket(this, websiteBucketName, {
+      websiteIndexDocument: 'index.html',
+      websiteErrorDocument: 'index.html',
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+      // publicReadAccess: true,
+    });
+    
+    webBucket.addToResourcePolicy(new iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      resources: [webBucket.arnForObjects('*')],
+      principals: [new iam.AnyPrincipal()],
+      conditions: {
+        'IpAddress': {
+          'aws:SourceIp': [
+            '41.60.235.126/16' // Please change it to your IP address or from your allowed list
+            ]
+        }
+      }
+      
+    }))
+    new cdk.CfnOutput(this, 'bucketURL', { value: webBucket.bucketWebsiteDomainName });
+    
+    // =====================================================================================
+    // Deploy site contents to S3 Bucket
+    // =====================================================================================
+    // new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+    //     sources: [s3deploy.Source.asset('./public') ],
+    //     destinationBucket: webBucket
+    // });
+    
+
     // =====================================================================================
     // Amazon DynamoDB table for storing image labels
     // =====================================================================================
     const table = new dynamodb.Table(this, 'ImageLabels', {
-      partitionKey: { name: 'image', type: dynamodb.AttributeType.STRING }
+      partitionKey: { name: 'image', type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY
     });
     new cdk.CfnOutput(this, 'ddbTable', { value: table.tableName });
 
