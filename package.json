@@ -11,7 +11,7 @@
     "cdk": "cdk"
   },
   "devDependencies": {
-    "@aws-cdk/aws-s3-deployment": "^1.197.0",
+    "@aws-cdk/aws-s3-deployment": "^1.194.0",
     "@types/jest": "^29.4.0",
     "@types/node": "18.13.0",
     "aws-cdk": "2.66.0",
@@ -28,6 +28,8 @@
     "@aws-cdk/aws-lambda": "^1.194.0",
     "@aws-cdk/aws-lambda-event-sources": "^1.194.0",
     "@aws-cdk/aws-s3": "^1.194.0",
+    "@aws-cdk/aws-s3-notifications": "^1.197.0",
+    "@aws-cdk/aws-sqs": "^1.197.0",
     "aws-cdk-lib": "2.66.0",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.21"

@@ -78,7 +78,7 @@ export class DevhrAwsStack extends cdk.Stack {
       conditions: {
         'IpAddress': {
           'aws:SourceIp': [
-            '41.60.235.126/16' // Please change it to your IP address or from your allowed list
+            '41.80.113.236/32' // Please change it to your IP address or from your allowed list
             ]
         }
       }
@@ -131,7 +131,7 @@ export class DevhrAwsStack extends cdk.Stack {
           "RESIZEDBUCKET": resizedBucket.bucketName
       },
     });
-    rekFn.addEventSource(new event_sources.S3EventSource(imageBucket, {events: [s3.EventType.OBJECT_CREATED]}))
+    // rekFn.addEventSource(new event_sources.S3EventSource(imageBucket, {events: [s3.EventType.OBJECT_CREATED]}))
     imageBucket.grantRead(rekFn);
     resizedBucket.grantPut(rekFn);
     table.grantWriteData(rekFn);
@@ -346,6 +346,36 @@ export class DevhrAwsStack extends cdk.Stack {
         }
       ]
     });
+    
+    // =====================================================================================
+    // Building SQS queue and DeadLetter Queue
+    // =====================================================================================
+    const dlQueue = new sqs.Queue(this, 'ImageDLQueue', {
+      queueName: 'ImageDLQueue'
+    })
+    ​
+    const queue = new sqs.Queue(this, 'ImageQueue', {
+      queueName: 'ImageQueue',
+      visibilityTimeout: cdk.Duration.seconds(30),
+      receiveMessageWaitTime: cdk.Duration.seconds(20),
+      deadLetterQueue: {
+        maxReceiveCount: 2,
+        queue: dlQueue
+      }
+    });
+    
+     // =====================================================================================
+    // Building S3 Bucket Create Notification to SQS
+    // =====================================================================================
+    imageBucket.addObjectCreatedNotification(new s3n.SqsDestination(queue), { prefix: 'private/' })
+  
+    // =====================================================================================
+    // Lambda(Rekognition) to consume messages from SQS
+    // =====================================================================================
+    rekFn.addEventSource(new event_sources.SqsEventSource(queue));
+  
+
+
     // The code that defines your stack goes here
 
     // example resource
