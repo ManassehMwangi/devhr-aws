@@ -101,7 +101,8 @@ def rekFunction(ourBucket, ourKey):
     try:
         detectLabelsResults = rekognition_client.detect_labels(Image={'S3Object': {'Bucket':ourBucket, 'Name':safeKey}},
         MaxLabels=10,
-        MinConfidence=minConfidence)
+        # MinConfidence=minConfidence
+        minConfidence = 50)
 
     except ClientError as e:
         logging.error(e)
