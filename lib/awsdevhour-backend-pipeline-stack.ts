@@ -36,34 +36,34 @@ export class AwsdevhourBackendPipelineStack extends Stack {
       parameterName: 'devhour-backend-git-branch'
     }).stringValue;
     
-    // const pipeline = new CdkPipeline(this, 'Pipeline', {
-    //   crossAccountKeys: false,
-    //   cloudAssemblyArtifact,
-    //   // Define application source
-    //   sourceAction: new codepipeline_actions.GitHubSourceAction({
-    //     actionName: 'GitHub',
-    //     output: sourceArtifact,
-    //     oauthToken: SecretValue.secretsManager('devhour-backend-git-access-token', {jsonField: 'devHourSeries1-git-access-token'}), // this token is stored in Secret Manager
-    //     owner: githubOwner,
-    //     repo: githubRepo,
-    //     branch: githubBranch
-    //   }),
-    //   // Define build and synth commands
-    //   synthAction: SimpleSynthAction.standardNpmSynth({
-    //     sourceArtifact,
-    //     cloudAssemblyArtifact,
-    //     buildCommand: 'rm -rf ./reklayer/* && wget https://awsdevhour.s3-accelerate.amazonaws.com/pillow.zip && unzip pillow.zip && mv ./python ./reklayer && rm pillow.zip && npm run build',
-    //     synthCommand: 'npm run cdk synth'
-    //   })
-    // });
+    const pipeline = new CdkPipeline(this, 'Pipeline', {
+      crossAccountKeys: false,
+      cloudAssemblyArtifact,
+      // Define application source
+      sourceAction: new codepipeline_actions.GitHubSourceAction({
+        actionName: 'GitHub',
+        output: sourceArtifact,
+        oauthToken: SecretValue.secretsManager('devhour-backend-git-access-token', {jsonField: 'devHourSeries1-git-access-token'}), // this token is stored in Secret Manager
+        owner: githubOwner,
+        repo: githubRepo,
+        branch: githubBranch
+      }),
+      // Define build and synth commands
+      synthAction: SimpleSynthAction.standardNpmSynth({
+        sourceArtifact,
+        cloudAssemblyArtifact,
+        buildCommand: 'rm -rf ./reklayer/* && wget https://awsdevhour.s3-accelerate.amazonaws.com/pillow.zip && unzip pillow.zip && mv ./python ./reklayer && rm pillow.zip && npm run build',
+        synthCommand: 'npm run cdk synth'
+      })
+    });
     
     //Define application stage
-    // const stage = pipeline.addApplicationStage(new AwsdevhourBackendPipelineStage(this, 'dev'));
+    const stage = pipeline.addApplicationStage(new AwsdevhourBackendPipelineStage(this, 'dev'));
 
-    // stage.addActions(new ManualApprovalAction({
-    //   actionName: 'ManualApproval',
-    //   runOrder: stage.nextSequentialRunOrder(),
-    // }));
+    stage.addActions(new ManualApprovalAction({
+      actionName: 'ManualApproval',
+      runOrder: stage.nextSequentialRunOrder(),
+    }));
 
   }
 }

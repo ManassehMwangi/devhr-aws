@@ -3,6 +3,7 @@ import 'source-map-support/register';
 // import * as cdk from 'aws-cdk-lib';
 import * as cdk from '@aws-cdk/core';
 import { DevhrAwsStack } from '../lib/devhr-aws-stack';
+import { AwsdevhourBackendPipelineStack } from '../lib/awsdevhour-backend-pipeline-stack';
 
 const app = new cdk.App();
 new DevhrAwsStack(app, 'DevhrAwsStack', {
@@ -20,3 +21,4 @@ new DevhrAwsStack(app, 'DevhrAwsStack', {
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
+new AwsdevhourBackendPipelineStack(app, 'AwsdevhourBackendPipelineStack');

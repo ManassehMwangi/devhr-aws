@@ -78,7 +78,7 @@ export class DevhrAwsStack extends cdk.Stack {
       conditions: {
         'IpAddress': {
           'aws:SourceIp': [
-            '41.80.113.236/32' // Please change it to your IP address or from your allowed list
+            '196.96.207.117/32' // Please change it to your IP address or from your allowed list
             ]
         }
       }
@@ -89,10 +89,10 @@ export class DevhrAwsStack extends cdk.Stack {
     // =====================================================================================
     // Deploy site contents to S3 Bucket
     // =====================================================================================
-    // new s3deploy.BucketDeployment(this, 'DeployWebsite', {
-    //     sources: [s3deploy.Source.asset('./public') ],
-    //     destinationBucket: webBucket
-    // });
+    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+        sources: [s3deploy.Source.asset('./public') ],
+        destinationBucket: webBucket
+    });
     
 
     // =====================================================================================
